@@ -1,0 +1,59 @@
+@import '../styles/shared-styles.css';
+
+/* Stores page specific styles */
+.stores-container {
+  padding: 20px;
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stores-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.stores-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.stores-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.stores-table th {
+  background-color: #f5f5f5;
+  padding: 12px 15px;
+  text-align: left;
+  font-weight: 600;
+  color: #555;
+}
+
+.stores-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #eee;
+  color: #333;
+}
+
+.stores-table-cell {
+  vertical-align: middle;
+}
+
+.stores-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.stores-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+}

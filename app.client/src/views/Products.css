@@ -1,0 +1,22 @@
+@import '../styles/shared-styles.css';
+.products-container {
+  padding: 20px;
+}
+
+.btn-new {
+  margin: 20px 0 1rem 20px;
+  display: block;
+  width: fit-content;
+}
+
+
+.loading,
+.error {
+  padding: 20px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.error {
+  color: #D32F2F;
+}
