@@ -5,8 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using app.server.Models;
-using app.server.Dtos;
-using app.server.Mappers;
 
 namespace app.server.Controllers
 {
@@ -23,78 +21,130 @@ namespace app.server.Controllers
 
         // GET: api/Product
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<ProductDto>>> GetProducts()
+        public async Task<ActionResult<IEnumerable<Product>>> GetProducts()
         {
-            var products = await _context.Products.ToListAsync();
-            return products.Select(p => ProductMapper.EntityToDto(p)).ToList();
+            try
+            {
+                Console.WriteLine("Fetching products from database...");
+                var products = await _context.Products.ToListAsync();
+                Console.WriteLine($"Found {products.Count} products");
+                return products;
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error fetching products: {ex.Message}");
+                return StatusCode(500, "Error accessing database");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching products: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
         // GET: api/Product/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<ProductDto>> GetProduct(int id)
+        public async Task<ActionResult<Product>> GetProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-
-            if (product == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("ID must be greater than 0");
             }
 
-            return ProductMapper.EntityToDto(product);
+            try 
+            {
+                Console.WriteLine($"Fetching product with ID: {id}");
+                var product = await _context.Products.FindAsync(id);
+
+                if (product == null)
+                {
+                    Console.WriteLine($"Product with ID {id} not found");
+                    return NotFound();
+                }
+
+                Console.WriteLine($"Successfully retrieved product ID {id}");
+                return product;
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error fetching product: {ex.Message}");
+                return StatusCode(500, "Error accessing database");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching product: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
         // PUT: api/Product/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutProduct(int id, ProductDto productDto)
+        public async Task<IActionResult> PutProduct(int id, Product product)
         {
-            if (id != productDto.Id)
+            // Basic validation
+            if (id <= 0)
+            {
+                return BadRequest("ID must be greater than 0");
+            }
+
+            // Business logic validation
+            if (id != product.Id)
             {
                 return BadRequest("ID in URL does not match ID in request body");
             }
 
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            var existingProduct = await _context.Products.FindAsync(id);
+            if (existingProduct == null)
             {
                 return NotFound();
             }
 
             try
             {
-                product.Name = productDto.Name ?? product.Name;
-                product.Price = productDto.Price ?? product.Price;
-                
+                Console.WriteLine($"Updating product ID {id}");
+                _context.Entry(existingProduct).CurrentValues.SetValues(product);
                 await _context.SaveChangesAsync();
+                Console.WriteLine($"Successfully updated product ID {id}");
+
+                return Ok(product);
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
+                Console.WriteLine($"Concurrency error updating product: {ex.Message}");
                 if (!ProductExists(id))
                 {
                     return NotFound();
                 }
                 else
                 {
-                    throw;
+                    return StatusCode(500, new { 
+                        message = "Concurrency error while updating product",
+                        error = ex.Message 
+                    });
                 }
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error updating product: {ex.Message}");
+                return StatusCode(500, "Error saving product to database");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                Console.WriteLine($"Error updating product: {ex.Message}");
+                return StatusCode(500, "Internal server error");
             }
-
-            return Ok(ProductMapper.EntityToDto(product));
         }
 
         // POST: api/Product
         [HttpPost]
-        public async Task<ActionResult<ProductDto>> PostProduct(ProductDto productDto)
+        public async Task<ActionResult<Product>> PostProduct(Product product)
         {
             try
             {
-                var product = ProductMapper.DtoToEntity(productDto);
                 _context.Products.Add(product);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction("GetProduct", new { id = product.Id }, ProductMapper.EntityToDto(product));
+                return CreatedAtAction("GetProduct", new { id = product.Id }, product);
             }
             catch (Exception ex)
             {
@@ -106,21 +156,38 @@ namespace app.server.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteProduct(int id)
         {
-            var product = await _context.Products.FindAsync(id);
-            if (product == null)
+            // Basic validation
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("ID must be greater than 0");
             }
 
-            try
+            try 
             {
+                Console.WriteLine($"Deleting product ID {id}");
+                var product = await _context.Products.FindAsync(id);
+                
+                if (product == null)
+                {
+                    Console.WriteLine($"Product with ID {id} not found");
+                    return NotFound();
+                }
+
                 _context.Products.Remove(product);
                 await _context.SaveChangesAsync();
+                Console.WriteLine($"Successfully deleted product ID {id}");
+                
                 return NoContent();
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error deleting product: {ex.Message}");
+                return StatusCode(500, "Error deleting product from database");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                Console.WriteLine($"Error deleting product: {ex.Message}");
+                return StatusCode(500, "Internal server error");
             }
         }
 

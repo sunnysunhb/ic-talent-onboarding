@@ -5,8 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using app.server.Models;
-using app.server.Dtos;
-using app.server.Mappers;
 
 namespace app.server.Controllers
 {
@@ -23,78 +21,132 @@ namespace app.server.Controllers
 
         // GET: api/Store
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<StoreDto>>> GetStores()
+        public async Task<ActionResult<IEnumerable<Store>>> GetStores()
         {
-            var stores = await _context.Stores.ToListAsync();
-            return stores.Select(s => StoreMapper.EntityToDto(s)).ToList();
+            try
+            {
+                Console.WriteLine("Fetching stores from database...");
+                var stores = await _context.Stores.ToListAsync();
+                Console.WriteLine($"Found {stores.Count} stores");
+                return stores;
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error fetching stores: {ex.Message}");
+                return StatusCode(500, "Error accessing database");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching stores: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
         // GET: api/Store/5
         [HttpGet("{id}")]
-        public async Task<ActionResult<StoreDto>> GetStore(int id)
+        public async Task<ActionResult<Store>> GetStore(int id)
         {
-            var store = await _context.Stores.FindAsync(id);
-
-            if (store == null)
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("ID must be greater than 0");
             }
 
-            return StoreMapper.EntityToDto(store);
+            try 
+            {
+                Console.WriteLine($"Fetching store with ID: {id}");
+                var store = await _context.Stores.FindAsync(id);
+
+                if (store == null)
+                {
+                    Console.WriteLine($"Store with ID {id} not found");
+                    return NotFound();
+                }
+
+                Console.WriteLine($"Successfully retrieved store ID {id}");
+                return store;
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error fetching store: {ex.Message}");
+                return StatusCode(500, "Error accessing database");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching store: {ex.Message}");
+                return StatusCode(500, "Internal server error");
+            }
         }
 
         // PUT: api/Store/5
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutStore(int id, StoreDto storeDto)
+        public async Task<IActionResult> PutStore(int id, Store store)
         {
-            if (id != storeDto.Id)
+            // Basic validation
+            if (id <= 0)
+            {
+                return BadRequest("ID must be greater than 0");
+            }
+
+            // Business logic validation
+            if (id != store.Id)
             {
                 return BadRequest("ID in URL does not match ID in request body");
             }
 
-            var store = await _context.Stores.FindAsync(id);
-            if (store == null)
+            var existingStore = await _context.Stores.FindAsync(id);
+            if (existingStore == null)
             {
                 return NotFound();
             }
 
             try
             {
-                store.Name = storeDto.Name ?? store.Name;
-                store.Address = storeDto.Address ?? store.Address;
+                Console.WriteLine($"Updating store ID {id}");
+                existingStore.Name = store.Name ?? existingStore.Name;
+                existingStore.Address = store.Address ?? existingStore.Address;
                 
                 await _context.SaveChangesAsync();
+                Console.WriteLine($"Successfully updated store ID {id}");
+
+                return Ok(existingStore);
             }
-            catch (DbUpdateConcurrencyException)
+            catch (DbUpdateConcurrencyException ex)
             {
+                Console.WriteLine($"Concurrency error updating store: {ex.Message}");
                 if (!StoreExists(id))
                 {
                     return NotFound();
                 }
                 else
                 {
-                    throw;
+                    return StatusCode(500, new { 
+                        message = "Concurrency error while updating store",
+                        error = ex.Message 
+                    });
                 }
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error updating store: {ex.Message}");
+                return StatusCode(500, "Error saving store to database");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                Console.WriteLine($"Error updating store: {ex.Message}");
+                return StatusCode(500, "Internal server error");
             }
-
-            return Ok(StoreMapper.EntityToDto(store));
         }
 
         // POST: api/Store
         [HttpPost]
-        public async Task<ActionResult<StoreDto>> PostStore(StoreDto storeDto)
+        public async Task<ActionResult<Store>> PostStore(Store store)
         {
             try
             {
-                var store = StoreMapper.DtoToEntity(storeDto);
                 _context.Stores.Add(store);
                 await _context.SaveChangesAsync();
 
-                return CreatedAtAction("GetStore", new { id = store.Id }, StoreMapper.EntityToDto(store));
+                return CreatedAtAction("GetStore", new { id = store.Id }, store);
             }
             catch (Exception ex)
             {
@@ -106,21 +158,38 @@ namespace app.server.Controllers
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteStore(int id)
         {
-            var store = await _context.Stores.FindAsync(id);
-            if (store == null)
+            // Basic validation
+            if (id <= 0)
             {
-                return NotFound();
+                return BadRequest("ID must be greater than 0");
             }
 
-            try
+            try 
             {
+                Console.WriteLine($"Deleting store ID {id}");
+                var store = await _context.Stores.FindAsync(id);
+                
+                if (store == null)
+                {
+                    Console.WriteLine($"Store with ID {id} not found");
+                    return NotFound();
+                }
+
                 _context.Stores.Remove(store);
                 await _context.SaveChangesAsync();
+                Console.WriteLine($"Successfully deleted store ID {id}");
+                
                 return NoContent();
+            }
+            catch (DbUpdateException ex)
+            {
+                Console.WriteLine($"Database error deleting store: {ex.Message}");
+                return StatusCode(500, "Error deleting store from database");
             }
             catch (Exception ex)
             {
-                return StatusCode(500, $"Internal server error: {ex.Message}");
+                Console.WriteLine($"Error deleting store: {ex.Message}");
+                return StatusCode(500, "Internal server error");
             }
         }
 
